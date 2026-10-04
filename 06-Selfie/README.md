@@ -1,6 +1,6 @@
-# Selfie — Flash-Borrowing a Governance Majority
+# Selfie - Flash-Borrowing a Governance Majority
 
-**Challenge:** Damn Vulnerable DeFi v4 — Selfie
+**Challenge:** Damn Vulnerable DeFi v4 - Selfie
 **Category:** Governance Manipulation / Flash Loan Voting Power
 **Severity:** Critical (the whole pool is drained, and no capital is needed)
 
