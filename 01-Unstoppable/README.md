@@ -1,6 +1,6 @@
-# Unstoppable — Breaking Flash Loans With a Single Token Transfer
+# Unstoppable - Breaking Flash Loans With a Single Token Transfer
 
-**Challenge:** Damn Vulnerable DeFi v4 — Unstoppable
+**Challenge:** Damn Vulnerable DeFi v4 - Unstoppable
 **Category:** Denial of Service / Broken Invariant
 **Severity:** High (see reasoning below — my first instinct was Medium, and I think that's wrong)
 
