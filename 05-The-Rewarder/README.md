@@ -1,6 +1,6 @@
-# The Rewarder — Claiming the Same Reward Hundreds of Times in One Call
+# The Rewarder - Claiming the Same Reward Hundreds of Times in One Call
 
-**Challenge:** Damn Vulnerable DeFi v4 — The Rewarder
+**Challenge:** Damn Vulnerable DeFi v4 - The Rewarder
 **Category:** Broken Invariant / Deferred Double-Claim Check
 **Severity:** Critical (the whole reward pool is drained by a single legitimate beneficiary)
 
