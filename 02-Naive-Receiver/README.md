@@ -1,6 +1,6 @@
-# Naive Receiver — Draining a Pool With a Forged Sender
+# Naive Receiver - Draining a Pool With a Forged Sender
 
-**Challenge:** Damn Vulnerable DeFi v4 — Naive Receiver
+**Challenge:** Damn Vulnerable DeFi v4 - Naive Receiver
 **Category:** Access Control / Meta-Transaction Sender Spoofing + Unchecked Flash Loan Initiator
 **Severity:** Critical (every token in the system is stolen, by anyone, in one transaction)
 
