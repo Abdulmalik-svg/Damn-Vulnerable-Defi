@@ -1,6 +1,6 @@
-# Side Entrance — Repaying a Flash Loan With a Deposit
+# Side Entrance - Repaying a Flash Loan With a Deposit
 
-**Challenge:** Damn Vulnerable DeFi v4 — Side Entrance
+**Challenge:** Damn Vulnerable DeFi v4 - Side Entrance
 **Category:** Broken Invariant / Flash Loan Repayment Bypass
 **Severity:** Critical (every ETH in the pool is stolen, by anyone, with no capital)
 
