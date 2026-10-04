@@ -2,12 +2,12 @@
 
 **Challenge:** Damn Vulnerable DeFi v4 - Unstoppable
 **Category:** Denial of Service / Broken Invariant
-**Severity:** High (see reasoning below — my first instinct was Medium, and I think that's wrong)
+**Severity:** High (see reasoning below - my first instinct was Medium, and I think that's wrong)
 
 ## What's going on
 
 This vault offers free flash loans on a million DVT tokens. You start with 10 DVT and
-nothing else — no admin access, no special permissions. The goal isn't to steal
+nothing else - no admin access, no special permissions. The goal isn't to steal
 anything. It's to break the flash loan feature entirely.
 
 Turns out you can do it with one line of code and 10 tokens you don't even lose.
@@ -38,7 +38,7 @@ comparing suddenly disagree — permanently.
    hands ownership back to the deployer. Flash loans are dead until someone manually
    steps in and fixes it.
 
-You can see this play out in the trace — `flashLoan()` reverts, `FlashLoanStatus(false)`
+You can see this play out in the trace - `flashLoan()` reverts, `FlashLoanStatus(false)`
 fires, and the vault flips to paused with ownership transferred away from the monitor.
 
 ## PoC
@@ -55,7 +55,7 @@ Full test file with trace output is in this folder.
 
 ## Why I'm calling this High, not Medium
 
-My first instinct was Medium — nobody's funds get stolen, nothing's permanently
+My first instinct was Medium - nobody's funds get stolen, nothing's permanently
 locked, this "just" breaks a feature. But sitting with it longer, that framing misses
 a few things that actually matter a lot in practice:
 
@@ -65,11 +65,11 @@ a few things that actually matter a lot in practice:
 - **The attacker doesn't even spend anything.** The 10 tokens aren't lost, they're just
   sitting in the vault now. This costs basically nothing beyond gas.
 - **Anyone can do it.** No special role, no timing window, no capital requirement.
-- **Flash loans aren't a side feature here — they're the product.** And presumably a
+- **Flash loans aren't a side feature here - they're the product.** And presumably a
   fee source for the protocol. Killing that indefinitely for free is a real problem.
 
-If the vault had some way to self-correct — say, a permissionless function anyone
-could call to resync the balance and shares — I'd be comfortable calling this Medium.
+If the vault had some way to self-correct - say, a permissionless function anyone
+could call to resync the balance and shares - I'd be comfortable calling this Medium.
 It doesn't have one, so I don't think Medium captures the actual impact. This is the
 kind of judgment call that's worth being able to defend with reasoning rather than
 just asserting a label, since reviewers on real contests will push back on severity
