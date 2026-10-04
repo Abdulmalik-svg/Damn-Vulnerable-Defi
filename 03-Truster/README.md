@@ -1,4 +1,4 @@
-# Truster — Letting the Borrower Choose What the Pool Calls
+# Truster - Letting the Borrower Choose What the Pool Calls
 
 **Challenge:** Damn Vulnerable DeFi v4 — Truster
 **Category:** Arbitrary External Call / Unauthorized Approval
