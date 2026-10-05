@@ -1,6 +1,6 @@
-# Compromised — Two Leaked Keys, One Rigged Oracle
+# Compromised - Two Leaked Keys, One Rigged Oracle
 
-**Challenge:** Damn Vulnerable DeFi v4 — Compromised
+**Challenge:** Damn Vulnerable DeFi v4 - Compromised
 **Category:** Oracle Manipulation / Compromised Trusted Sources
 **Severity:** Critical (the exchange's entire ETH balance is drained)
 
