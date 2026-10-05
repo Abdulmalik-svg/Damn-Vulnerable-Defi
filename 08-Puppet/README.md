@@ -1,6 +1,6 @@
-# Puppet — Pricing Collateral From a Pool You Can Move
+# Puppet - Pricing Collateral From a Pool You Can Move
 
-**Challenge:** Damn Vulnerable DeFi v4 — Puppet
+**Challenge:** Damn Vulnerable DeFi v4 - Puppet
 **Category:** Oracle Manipulation / Spot Price From a Shallow AMM
 **Severity:** Critical (the whole lending pool is drained for a fraction of its value)
 
