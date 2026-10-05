@@ -1,6 +1,6 @@
-# Free Rider — One Payment, Six NFTs, and the Seller Is You
+# Free Rider - One Payment, Six NFTs, and the Seller Is You
 
-**Challenge:** Damn Vulnerable DeFi v4 — Free Rider
+**Challenge:** Damn Vulnerable DeFi v4 - Free Rider
 **Category:** Business Logic / Payment Accounting + Flash Swap for Capital
 **Severity:** Critical (the marketplace pays its entire ETH balance to the buyer)
 
