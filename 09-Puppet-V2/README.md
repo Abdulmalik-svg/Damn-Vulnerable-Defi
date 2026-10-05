@@ -1,6 +1,6 @@
-# Puppet V2 — Same Spot-Price Mistake, Bigger Collateral Factor
+# Puppet V2 - Same Spot-Price Mistake, Bigger Collateral Factor
 
-**Challenge:** Damn Vulnerable DeFi v4 — Puppet V2
+**Challenge:** Damn Vulnerable DeFi v4 - Puppet V2
 **Category:** Oracle Manipulation / Spot Price From a Shallow AMM
 **Severity:** Critical (the whole lending pool is drained for a fraction of its value)
 
