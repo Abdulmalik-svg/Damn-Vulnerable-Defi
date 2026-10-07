@@ -9,7 +9,7 @@
 This one is based on a real incident, not a made-up scenario. A wallet deployer pays out
 1 DVT to anyone who deploys a Gnosis Safe at an address an authorizer contract has
 pre-approved. The idea is that a known "ward" gets rewarded for deploying a specific
-user's wallet at a specific, already-computed address — in this case
+user's wallet at a specific, already-computed address - in this case
 `0xCe07CF30B540Bb84ceC5dA5547e1cb4722F9E496`, which already holds 20,000,000 DVT because
 someone sent funds there before the wallet existed. The player starts with nothing and
 has to walk away having put that Safe in place, sent the funds to the rightful user, and
