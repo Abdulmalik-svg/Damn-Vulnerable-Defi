@@ -1,6 +1,6 @@
-# Backdoor — Running Code Inside a Wallet Before the Registry Looks at It
+# Backdoor - Running Code Inside a Wallet Before the Registry Looks at It
 
-**Challenge:** Damn Vulnerable DeFi v4 — Backdoor
+**Challenge:** Damn Vulnerable DeFi v4 - Backdoor
 **Category:** Unsafe Initialization / Validation After the Fact
 **Severity:** Critical (every reward token in the registry is stolen)
 
