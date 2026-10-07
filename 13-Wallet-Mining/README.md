@@ -1,6 +1,6 @@
-# Wallet Mining — A Storage Collision Reopens the Door
+# Wallet Mining - A Storage Collision Reopens the Door
 
-**Challenge:** Damn Vulnerable DeFi v4 — Wallet Mining
+**Challenge:** Damn Vulnerable DeFi v4 - Wallet Mining
 **Category:** Storage Collision / Unprotected Re-Initialization / CREATE2 Address Mining
 **Severity:** Critical (20,000,000 DVT sitting at a not-yet-deployed address, plus the reward pot)
 
