@@ -1,6 +1,6 @@
-# Climber — A Timelock That Executes First and Checks Afterwards
+# Climber - A Timelock That Executes First and Checks Afterwards
 
-**Challenge:** Damn Vulnerable DeFi v4 — Climber
+**Challenge:** Damn Vulnerable DeFi v4 - Climber
 **Category:** Access Control / Check-Effects Ordering / Governance Takeover
 **Severity:** Critical (full takeover of the vault and every token in it)
 
