@@ -1,6 +1,6 @@
-# ABI Smuggling — Checking One Selector, Executing Another
+# ABI Smuggling - Checking One Selector, Executing Another
 
-**Challenge:** Damn Vulnerable DeFi v4 — ABI Smuggling
+**Challenge:** Damn Vulnerable DeFi v4 - ABI Smuggling
 **Category:** Access Control Bypass / Calldata Decoding Mismatch
 **Severity:** Critical (every token in the vault is drained by an account with no real permission to do so)
 
@@ -8,7 +8,7 @@
 
 A vault holds 1,000,000 DVT and only lets permissioned (selector, caller, target)
 triples execute through a generic `execute(target, actionData)` entry point. The
-player is only authorized for `withdraw`, which is capped at 1 ETH every 15 days —
+player is only authorized for `withdraw`, which is capped at 1 ETH every 15 days -
 nowhere near enough to matter. The deployer alone is authorized for `sweepFunds`,
 which drains the whole balance with no cap. The goal is for the player to walk away
 with everything anyway.
@@ -33,7 +33,7 @@ function execute(address target, bytes calldata actionData) external nonReentran
 ```
 
 Byte 100 only lines up with the real start of `actionData`'s contents when the dynamic
-`bytes` parameter is encoded with its offset word at the canonical value (`0x40`) —
+`bytes` parameter is encoded with its offset word at the canonical value (`0x40`) -
 which is how `abi.encodeCall` would produce it, but calldata is attacker-supplied, so
 nothing enforces that. Solidity's actual decoder for `bytes calldata actionData`
 follows the **real offset word**, wherever the caller points it, when it builds the
