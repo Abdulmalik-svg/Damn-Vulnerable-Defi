@@ -1,6 +1,6 @@
-# Shards — Two Formulas for the Same Conversion, Only One of Them Right
+# Shards - Two Formulas for the Same Conversion, Only One of Them Right
 
-**Challenge:** Damn Vulnerable DeFi v4 — Shards
+**Challenge:** Damn Vulnerable DeFi v4 - Shards
 **Category:** Arithmetic Mismatch / Missing Scaling Factor
 **Severity:** Critical (the marketplace's DVT balance is drained through fill/cancel alone, no NFT ever bought)
 
@@ -49,7 +49,7 @@ they actually paid.
 
 **Bootstrap for free.** There's a `want` small enough that `fill()`'s payment rounds
 down to exactly zero (the division by `totalShards` floors it away), while `cancel()`'s
-refund — which never divides by `totalShards` — still pays out a real, nonzero amount.
+refund — which never divides by `totalShards` - still pays out a real, nonzero amount.
 That one call costs nothing and hands the attacker their first DVT.
 
 **Scale it up, repeatedly.** With DVT in hand, loop: compute the largest `want` that
@@ -105,14 +105,14 @@ the marketplace's remaining balance fell below the loop's cutoff. Full test file
   drained by a wide margin, not a rounding-dust amount.
 - **The two formulas were never meant to diverge.** `fill()` getting the scaling right
   and `cancel()` getting it wrong means the vulnerability isn't a deliberate design
-  trade-off anywhere — it's a straightforward implementation slip in one function that
+  trade-off anywhere - it's a straightforward implementation slip in one function that
   should mirror the other exactly, inverted.
 
 ## Fix
 
 - Refund exactly what was charged. The simplest fix is to store the actual DVT amount
   paid in the `Purchase` struct at `fill()` time, and have `cancel()` refund that stored
-  value directly — removing the need for a second, independently-derived formula that
+  value directly - removing the need for a second, independently-derived formula that
   can drift out of sync.
 - If a formula must be recomputed instead of stored, it must use the identical scaling
   as the charge formula (`× price / totalShards`), not a subset of it.
@@ -124,7 +124,7 @@ the marketplace's remaining balance fell below the loop's cutoff. Full test file
 
 Whenever a protocol computes the same conversion (price ↔ units, shares ↔ assets,
 shards ↔ payment) in more than one place, check that every instance uses the exact same
-formula — not just the same inputs. A payment function and its corresponding refund or
+formula - not just the same inputs. A payment function and its corresponding refund or
 cancellation function are the single most common place for this kind of drift, because
 they're written separately, often far apart in the file, and nothing forces them to stay
 mirrored as the code evolves.
