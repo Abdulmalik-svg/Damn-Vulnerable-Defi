@@ -1,6 +1,6 @@
-# Withdrawal — An Unchecked Call Result Behind a Privileged Shortcut
+# Withdrawal - An Unchecked Call Result Behind a Privileged Shortcut
 
-**Challenge:** Damn Vulnerable DeFi v4 — Withdrawal
+**Challenge:** Damn Vulnerable DeFi v4 - Withdrawal
 **Category:** Unchecked External Call / Privileged Proof Bypass
 **Severity:** Critical (a near-total bridge drain gets marked "finalized" with the underlying transfer silently reverted, and the operator shortcut lets an attacker force that outcome on demand)
 
@@ -36,10 +36,10 @@ emit FinalizedWithdrawal(leaf, success, isOperator);
 ```
 
 If the downstream call reverts for any reason, the leaf is still marked finalized and
-the counter still increments — "finalized" and "funds actually moved" are not the same
+the counter still increments - "finalized" and "funds actually moved" are not the same
 thing here, and nothing enforces that they should be.
 
-**2. Operators skip proof verification entirely — for arbitrary data.** The Merkle
+**2. Operators skip proof verification entirely - for arbitrary data.** The Merkle
 check only runs for non-operators:
 
 ```solidity
@@ -50,7 +50,7 @@ if (!isOperator) {
 ```
 
 An operator can call `finalizeWithdrawal` with **any** `(nonce, l2Sender, target,
-timestamp, message)` tuple of their choosing — not just ones that were ever actually
+timestamp, message)` tuple of their choosing - not just ones that were ever actually
 queued on L2. Nothing about that privilege is scoped to "skip proving a withdrawal you
 already know is real"; it's "execute literally anything."
 
@@ -58,11 +58,11 @@ already know is real"; it's "execute literally anything."
 
 `TokenBridge.executeTokenWithdrawal` does `totalDeposits -= amount;` under Solidity
 0.8's checked arithmetic. If an attacker (as operator) first forges and finalizes a
-small, *real* withdrawal of their own — one that legitimately routes through
-`L1Forwarder → TokenBridge` and actually transfers funds — they can drain just enough
+small, *real* withdrawal of their own - one that legitimately routes through
+`L1Forwarder → TokenBridge` and actually transfers funds - they can drain just enough
 of `totalDeposits` to push it below the 999,000 DVT the big real withdrawal needs.
 When that big withdrawal is then finalized, the arithmetic underflows and the inner
-call reverts — silently, thanks to bug #1 — so the leaf is marked finalized with zero
+call reverts - silently, thanks to bug #1 - so the leaf is marked finalized with zero
 tokens moved.
 
 ## The attack
