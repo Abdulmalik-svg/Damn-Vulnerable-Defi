@@ -1,6 +1,6 @@
-# Curvy Puppet — Read-Only Reentrancy on a Real Mainnet Curve Pool
+# Curvy Puppet - Read-Only Reentrancy on a Real Mainnet Curve Pool
 
-**Challenge:** Damn Vulnerable DeFi v4 — Curvy Puppet
+**Challenge:** Damn Vulnerable DeFi v4 - Curvy Puppet
 **Category:** Read-Only Reentrancy / Stale Oracle Read During an In-Progress External Call
 **Severity:** Critical (three fully-collateralized users get liquidated and lose their entire DVT collateral, based entirely on a price the pool itself was still in the middle of updating)
 
