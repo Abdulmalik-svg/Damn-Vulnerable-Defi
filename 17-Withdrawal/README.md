@@ -105,7 +105,7 @@ Full test file: `test/withdrawal/Withdrawal.t.sol`
   record is to be a reliable audit trail of what actually happened; here it can be made
   true for withdrawals that moved zero funds.
 - **The operator shortcut has no scope.** It was clearly meant to let a trusted relayer
-  skip re-proving something already known to be valid — not to grant arbitrary-data
+  skip re-proving something already known to be valid - not to grant arbitrary-data
   execution power with the gateway's 7-day delay as the only remaining check.
 - **The two issues compound into an active attack, not just a passive risk.** An
   operator can deliberately engineer the underflow on demand against a specific target
@@ -113,7 +113,7 @@ Full test file: `test/withdrawal/Withdrawal.t.sol`
   reasons.
 - **The downstream consequences are silent.** A large legitimate withdrawal appears
   processed everywhere an indexer or monitoring system would check (`finalized ==
-  true`, `counter` incremented, event emitted) while the actual funds never moved —
+  true`, `counter` incremented, event emitted) while the actual funds never moved -
   exactly the kind of state a real user or auditor would trust without digging further.
 
 ## Fix
