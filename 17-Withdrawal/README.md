@@ -135,9 +135,9 @@ Full test file: `test/withdrawal/Withdrawal.t.sol`
 
 Two patterns worth carrying into real audits from this one. First: any low-level `call`
 whose `success` is captured but not acted on is a silent-failure bug waiting for a
-trigger — search for `success :=` or `(bool success, ) = ... .call(...)` followed by no
+trigger - search for `success :=` or `(bool success, ) = ... .call(...)` followed by no
 `require`/`revert`. Second: a role meant to "skip a redundant check" is easy to
-over-scope into "skip *all* checks" — audit exactly what a privileged bypass actually
+over-scope into "skip *all* checks" - audit exactly what a privileged bypass actually
 grants, not just what it was presumably intended for. Combined, these two patterns let
 an attacker engineer exactly the external-call failure they need, on demand, and have
 the system record it as a success anyway.
