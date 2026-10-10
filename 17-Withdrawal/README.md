@@ -119,7 +119,7 @@ Full test file: `test/withdrawal/Withdrawal.t.sol`
 ## Fix
 
 - **Check the call's result and revert, or explicitly track failure, instead of
-  silently continuing.** At minimum: `if (!success) revert WithdrawalFailed(leaf);` —
+  silently continuing.** At minimum: `if (!success) revert WithdrawalFailed(leaf);` -
   or, if partial-failure handling is genuinely intended, only mark `finalized` on
   success and expose a separate, honest "attempted but failed" state (the way
   `L1Forwarder` does with its own `successfulMessages`/`failedMessages` split).
